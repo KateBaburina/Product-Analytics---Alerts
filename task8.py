@@ -29,7 +29,7 @@ schedule_interval = '*/15 * * * *'
 class Getch:
     def __init__(self, query, db='simulator_20220720'):
         self.connection = {
-            'host': 'https://clickhouse.lab.karpov.courses',
+            'host': HOST,
             'password': 'dpo_python_2020',
             'user': 'student',
             'database': db,

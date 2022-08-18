@@ -91,7 +91,7 @@ def dag_alerts_baburina():
     @task()
     def run_alerts_feed(chat=None):
         chat_id = chat or -788021703
-        bot = telegram.Bot(token = '5459195150:AAFvzrjCRiweqxr31LlCYTfiLboDV4CPgYY')
+        bot = telegram.Bot(token = os.environ.get("REPORT_BOT_TOKEN"))
         data = Getch('''SELECT
                            toStartOfFifteenMinutes(time) as ts,
                            toDate(time) as date,

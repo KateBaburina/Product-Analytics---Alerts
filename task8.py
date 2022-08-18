@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import sys
 import os
 
-# Дефолтные параметры, которые прокидываются в таски
+# Default parameteres that will be used in tasks
 default_args = {
     'owner': 'e-baburina-9',
     'depends_on_past': False,
@@ -23,7 +23,7 @@ default_args = {
     'start_date': datetime(2022, 8, 5),
 }
 
-# Интервал запуска DAG
+# DAG schedule interval - cron - every 15 minutes
 schedule_interval = '*/15 * * * *'
 
 class Getch:
@@ -47,7 +47,7 @@ class Getch:
             exit(0)
 
    
-# Функция реализует поиск аномалий в данных, используя межквартильный размах
+# Function that checks anomaly in data using Interquartile range
 def check_anomaly_interquartile_range(df, metric, a=4, n=5):
     df['q25']= df[metric].shift(1).rolling(n).quantile(0.25)
     df['q75']= df[metric].shift(1).rolling(n).quantile(0.75)
@@ -57,7 +57,7 @@ def check_anomaly_interquartile_range(df, metric, a=4, n=5):
     df['up'] = df['up'].rolling(n, center=True, min_periods=1).mean()
     df['low'] = df['low'].rolling(n, center=True, min_periods=1).mean()
     
-    # Если метрика находится за пределами доверительного интервала, флаг поднимаем
+    # If the metric is outside the confidence interval, flag is raised
     if df[metric].iloc[-1] < df['low'].iloc[-1] or df[metric].iloc[-1] > df['up'].iloc[-1] :
         is_alert = 1
     else:
@@ -65,7 +65,7 @@ def check_anomaly_interquartile_range(df, metric, a=4, n=5):
         
     return is_alert, df
 
-# Функция реализует поиск аномалий в данных, используя правило 3 сигм. Можно изменять кол-во стандартных отклонений, переменная - a
+# Function that checks anomaly in data using three-sigma rule. You can change the number of Stds, variable - a
 def check_anomaly_sigma(df, metric, a=3, n=5):
    
     df['Std']= df[metric].shift(1).rolling(n).std()
@@ -76,7 +76,7 @@ def check_anomaly_sigma(df, metric, a=3, n=5):
     df['up'] = df['up'].rolling(n, center=True, min_periods=1).mean()
     df['low'] = df['low'].rolling(n, center=True, min_periods=1).mean()
         
-    # Если метрика находится за пределами доверительного интервала, флаг поднимаем
+    # If the metric is outside the confidence interval, flag is raised
     if df[metric].iloc[-1] < df['low'].iloc[-1] or df[metric].iloc[-1] > df['up'].iloc[-1] :
         is_alert = 1
     else:
@@ -87,7 +87,7 @@ def check_anomaly_sigma(df, metric, a=3, n=5):
 @dag(default_args=default_args, schedule_interval=schedule_interval, catchup=False)
 def dag_alerts_baburina():
     
-    # Функция системы алертов для ленты
+    # Alert system function - feed
     @task()
     def run_alerts_feed(chat=None):
         chat_id = chat or -788021703
@@ -114,18 +114,18 @@ def dag_alerts_baburina():
             df = data[['ts', 'date', 'hm', metric]].copy()
             is_alert, df = check_anomaly_interquartile_range(df, metric)
 
-            # Если метрика находится за пределами доверительного интервала, срабатывает алерт, посылается сообщение
+            # If the metric is outside the confidence interval, flag is raised, alert function triggers, and the message is sent to chat
 
             if is_alert == 1:
                 msg = '''Interquartile_range:\n{metric} metric:\ncurrent value: {current_val:.2f}\ndeviation from the previous value: {last_val_diff:.2%}\nhttp://superset.lab.karpov.courses/r/1721'''.format(metric=metric, current_val=df[metric].iloc[-1], last_val_diff=abs(1-(df[metric].iloc[-1]/df[metric].iloc[-2])))
                 sns.set(rc={'figure.figsize': (16,10)})
-                # Рисуем график
+                # Drawing the plot
                 plt.tight_layout()
                 ax = sns.lineplot(x=df['ts'], y=df[metric], label = 'metric')
                 ax = sns.lineplot(x=df['ts'], y=df['up'], label = 'up')
                 ax = sns.lineplot(x=df['ts'], y=df['low'], label = 'low')
 
-                # Рисуем график, скрывая некоторые деления, чтобы не загромождать график
+                # Drawing the plot hiding some ticks, so the plot is not cluttered
                 for ind, label in enumerate(ax.get_xticklabels()):
                     if ind % 2 == 0:
                         label.set_visible(True)
@@ -137,20 +137,20 @@ def dag_alerts_baburina():
                             ax.set_title(metric)
                             ax.set(ylim=(0, None))
 
-                            # Создаем файловый объект, чтобы не выгружать файл локально
+                            # Creating the file object, so we do not need to store the plot locally to save space
                             plot_object =io.BytesIO()
                             ax.figure.savefig(plot_object)
-                            # Перемещаем курсор в начало строки файлового объекта
+                            # Moving the cursor at the beginning of the file object
                             plot_object.seek(0)
-                            # Называем объект
+                            # Naming the object
                             plot_object.name = 'Plot.png'.format(metric)
-                            # Закрываем matplotlib.pyplot
+                            # Closing matplotlib.pyplot
                             plt.close()
                 bot.sendMessage(chat_id=chat_id, text=msg)
                 bot.sendPhoto(chat_id=chat_id, photo=plot_object)
         return
 
-    # Функция системы алертов для мессенджера
+    # Alert system function - messenger
     @task()
     def run_alerts_messenger(chat=None):
         chat_id = chat or -788021703
@@ -176,18 +176,18 @@ def dag_alerts_baburina():
             df = data[['ts', 'date', 'hm', metric]].copy()
             is_alert, df = check_anomaly_interquartile_range(df, metric)
 
-            # Если метрика находится за пределами доверительного интервала, срабатывает алерт, посылается сообщение
+            # It metric is outside the confidence interval, flag is raised, alert function triggers, and the message is sent to chat
 
             if is_alert == 1:
                 msg = '''Interquartile_range:\n{metric} metric:\ncurrent value: {current_val:.2f}\ndeviation from the previous value: {last_val_diff:.2%}\nhttp://superset.lab.karpov.courses/r/1721'''.format(metric=metric, current_val=df[metric].iloc[-1], last_val_diff=abs(1-(df[metric].iloc[-1]/df[metric].iloc[-2])))
                 sns.set(rc={'figure.figsize': (16,10)})
-                # Рисуем график
+                # Drawing the plot
                 plt.tight_layout()
                 ax = sns.lineplot(x=df['ts'], y=df[metric], label = 'metric')
                 ax = sns.lineplot(x=df['ts'], y=df['up'], label = 'up')
                 ax = sns.lineplot(x=df['ts'], y=df['low'], label = 'low')
 
-                # Рисуем график, скрывая некоторые деления, чтобы не загромождать график
+                # Drawing the plot hiding some ticks, so the plot is not cluttered
                 for ind, label in enumerate(ax.get_xticklabels()):
                     if ind % 2 == 0:
                         label.set_visible(True)
@@ -199,20 +199,20 @@ def dag_alerts_baburina():
                             ax.set_title(metric)
                             ax.set(ylim=(0, None))
 
-                            # Создаем файловый объект, чтобы не выгружать файл локально
+                            # Creating the file object, so we do not need to store the plot locally to save space
                             plot_object =io.BytesIO()
                             ax.figure.savefig(plot_object)
-                            # Перемещаем курсор в начало строки файлового объекта
+                            # Moving the cursor at the beginning of the file object
                             plot_object.seek(0)
-                            # Называем объект
+                            # Naming the object
                             plot_object.name = 'Plot.png'.format(metric)
-                            # Закрываем matplotlib.pyplot
+                            # Closing matplotlib.pyplot
                             plt.close()
                 bot.sendMessage(chat_id=chat_id, text=msg)
                 bot.sendPhoto(chat_id=chat_id, photo=plot_object)
         return
     
-    # Функция системы алертов для ленты - правило 3 сигм
+    # Alert system function - three-sigma rule - feed
     @task()
     def run_alerts_feed_sigma(chat=None):
         chat_id = chat or -788021703
@@ -239,18 +239,18 @@ def dag_alerts_baburina():
             df = data[['ts', 'date', 'hm', metric]].copy()
             is_alert, df = check_anomaly_sigma(df, metric)
 
-            # Если метрика находится за пределами доверительного интервала, срабатывает алерт, посылается сообщение
+            # If the metric is outside the confidence interval, flag is raised, alert function triggers, and the message is sent to chat
 
             if is_alert == 1:
                 msg = '''Three-sigma rule:\n{metric} metric:\ncurrent value: {current_val:.2f}\ndeviation from the previous value: {last_val_diff:.2%}\nhttp://superset.lab.karpov.courses/r/1721'''.format(metric=metric, current_val=df[metric].iloc[-1], last_val_diff=abs(1-(df[metric].iloc[-1]/df[metric].iloc[-2])))
                 sns.set(rc={'figure.figsize': (16,10)})
-                # Рисуем график
+                # Drawing the plot
                 plt.tight_layout()
                 ax = sns.lineplot(x=df['ts'], y=df[metric], label = 'metric')
                 ax = sns.lineplot(x=df['ts'], y=df['up'], label = 'up')
                 ax = sns.lineplot(x=df['ts'], y=df['low'], label = 'low')
 
-                # Рисуем график, скрывая некоторые деления, чтобы не загромождать график
+                # Drawing the plot hiding some ticks, so the plot is not cluttered
                 for ind, label in enumerate(ax.get_xticklabels()):
                     if ind % 2 == 0:
                         label.set_visible(True)
@@ -262,20 +262,20 @@ def dag_alerts_baburina():
                             ax.set_title(metric)
                             ax.set(ylim=(0, None))
 
-                            # Создаем файловый объект, чтобы не выгружать файл локально
+                            # Creating the file object, so we do not need to store the plot locally to save space
                             plot_object =io.BytesIO()
                             ax.figure.savefig(plot_object)
-                            # Перемещаем курсор в начало строки файлового объекта
+                            # Moving the cursor at the beginning of the file object
                             plot_object.seek(0)
-                            # Называем объект
+                            # Naming the object
                             plot_object.name = 'Plot.png'.format(metric)
-                            # Закрываем matplotlib.pyplot
+                            # Closing matplotlib.pyplo
                             plt.close()
                 bot.sendMessage(chat_id=chat_id, text=msg)
                 bot.sendPhoto(chat_id=chat_id, photo=plot_object)
         return
     
-    # Функция системы алертов для мессенджера - правило 3 сигм
+    # Alert system function - three-sigma rule - messenger
     @task()
     def run_alerts_messenger_sigma(chat=None):
         chat_id = chat or -788021703
@@ -301,18 +301,18 @@ def dag_alerts_baburina():
             df = data[['ts', 'date', 'hm', metric]].copy()
             is_alert, df = check_anomaly_sigma(df, metric)
 
-            # Если метрика находится за пределами доверительного интервала, срабатывает алерт, посылается сообщение
+            # If the metric is outside the confidence interval, flag is raised, alert function triggers, and the message is sent to chat
 
             if is_alert == 1:
                 msg = '''Three-sigma rule:\n{metric} metric:\ncurrent value: {current_val:.2f}\ndeviation from the previous value: {last_val_diff:.2%}\nhttp://superset.lab.karpov.courses/r/1721'''.format(metric=metric, current_val=df[metric].iloc[-1], last_val_diff=abs(1-(df[metric].iloc[-1]/df[metric].iloc[-2])))
                 sns.set(rc={'figure.figsize': (16,10)})
-                # Рисуем график
+                # Drawing the plot
                 plt.tight_layout()
                 ax = sns.lineplot(x=df['ts'], y=df[metric], label = 'metric')
                 ax = sns.lineplot(x=df['ts'], y=df['up'], label = 'up')
                 ax = sns.lineplot(x=df['ts'], y=df['low'], label = 'low')
 
-                # Рисуем график, скрывая некоторые деления, чтобы не загромождать график
+                # Drawing the plot hiding some ticks, so the plot is not cluttered
                 for ind, label in enumerate(ax.get_xticklabels()):
                     if ind % 2 == 0:
                         label.set_visible(True)
@@ -324,14 +324,14 @@ def dag_alerts_baburina():
                             ax.set_title(metric)
                             ax.set(ylim=(0, None))
 
-                            # Создаем файловый объект, чтобы не выгружать файл локально
+                            # Creating the file object, so we do not need to store the plot locally to save space
                             plot_object =io.BytesIO()
                             ax.figure.savefig(plot_object)
-                            # Перемещаем курсор в начало строки файлового объекта
+                            # Moving the cursor at the beginning of the file object
                             plot_object.seek(0)
-                            # Называем объект
+                            # Naming the object
                             plot_object.name = 'Plot.png'.format(metric)
-                            # Закрываем matplotlib.pyplot
+                            # Closing matplotlib.pyplot
                             plt.close()
                 bot.sendMessage(chat_id=chat_id, text=msg)
                 bot.sendPhoto(chat_id=chat_id, photo=plot_object)

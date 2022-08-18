@@ -24,6 +24,10 @@ Apache Airflow, dags
 
 ClickHouse
 
+## Visuals
+
+Matplotlib, Seaborn
+
 ## Task
 
 We need to create an alert system that is monitoring the product metrics every 15 minutes and in case of any anomalies the alert is sent to Telegram chat automatically.

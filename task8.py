@@ -27,7 +27,7 @@ default_args = {
 schedule_interval = '*/15 * * * *'
 
 class Getch:
-    def __init__(self, query, db='simulator_20220720'):
+    def __init__(self, query, db=DB):
         self.connection = {
             'host': HOST,
             'password': 'dpo_python_2020',
@@ -90,7 +90,7 @@ def dag_alerts_baburina():
     # Alert system function - feed
     @task()
     def run_alerts_feed(chat=None):
-        chat_id = chat or -788021703
+        chat_id = chat or CHAT1
         bot = telegram.Bot(token = os.environ.get("REPORT_BOT_TOKEN"))
         data = Getch('''SELECT
                            toStartOfFifteenMinutes(time) as ts,
@@ -153,7 +153,7 @@ def dag_alerts_baburina():
     # Alert system function - messenger
     @task()
     def run_alerts_messenger(chat=None):
-        chat_id = chat or -788021703
+        chat_id = chat or CHAT1
         bot = telegram.Bot(token=os.environ.get("REPORT_BOT_TOKEN"))
 
         data = Getch('''SELECT
@@ -215,7 +215,7 @@ def dag_alerts_baburina():
     # Alert system function - three-sigma rule - feed
     @task()
     def run_alerts_feed_sigma(chat=None):
-        chat_id = chat or -788021703
+        chat_id = chat or CHAT1
         bot = telegram.Bot(token = os.environ.get("REPORT_BOT_TOKEN"))
         data = Getch('''SELECT
                            toStartOfFifteenMinutes(time) as ts,
@@ -278,7 +278,7 @@ def dag_alerts_baburina():
     # Alert system function - three-sigma rule - messenger
     @task()
     def run_alerts_messenger_sigma(chat=None):
-        chat_id = chat or -788021703
+        chat_id = chat or CHAT1
         bot = telegram.Bot(token=os.environ.get("REPORT_BOT_TOKEN"))
 
         data = Getch('''SELECT
